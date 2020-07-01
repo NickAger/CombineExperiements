@@ -1,6 +1,12 @@
 #!/usr/bin/env stack
 -- stack --resolver lts-13.9 script --package text --package scotty
 
+{- 
+download stack using either:
+* curl -sSL https://get.haskellstack.org/ | sh
+* brew install haskell-stack
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 
 import           Data.Maybe

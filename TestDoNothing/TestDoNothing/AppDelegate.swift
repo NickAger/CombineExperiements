@@ -9,7 +9,6 @@
 import UIKit
 import Combine
 
-
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
     var cancellable2: AnyCancellable?
@@ -17,8 +16,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
-        let future = authenticateAndDownloadUserInfo(username: "stack", password: "overflow").doNothing()
-        // cancellable2 = future.showActivityIndicatorWhileWaiting(message: "Please wait downloading")
+//        let future = authenticateAndDownloadUserInfo(username: "stack", password: "overflow")/*.assertSinglePipeline()*/
+//        let future = downloadUserInfo(username: "Nick")
+        let future = authenticateAndDownloadUserInfo8080(username: "stack", password: "overflow")
+//        let future = downloadUserInfo8080(username: "Nick")
+        cancellable2 = future.showActivityIndicatorWhileWaiting(message: "Please wait downloading")
         cancellable = future.sink(receiveCompletion: { (completion) in
             switch completion {
             case .finished:
@@ -57,15 +59,27 @@ struct AssertSinglePipeline<Upstream: Publisher>: Publisher {
     typealias Output = Upstream.Output
     typealias Failure = Upstream.Failure
     let upstream: Upstream
+    let prefix: String
+    let file: StaticString
+    let line: UInt
     let receivedSubscriptionCount = CountBox()
-    init(upstream: Upstream) {
+    init(upstream: Upstream, prefix: String, file: StaticString, line: UInt) {
+        Swift.print("AssertSinglePipeline.init()")
         self.upstream = upstream
+        self.prefix = prefix
+        self.file = file
+        self.line = line
     }
     // When subscribed to, subscribe my Inner _upstream_
     func receive<S>(subscriber: S)
         where S : Subscriber, S.Input == Output, S.Failure == Failure {
             receivedSubscriptionCount.increment()
-            assert(receivedSubscriptionCount.value == 1, "Only expected one subscriber, try adding '.share()'")
+            Swift.print("AssertSinglePipeline.receive, \(receivedSubscriptionCount.value)")
+            if receivedSubscriptionCount.value != 1 {
+                let prefix = self.prefix.isEmpty ? "" : self.prefix + ": "
+                fatalError("\(prefix)Only expected one subscriber, but count = \(receivedSubscriptionCount.value). Try adding '.share()' to pipeline", file: file, line: line)
+            }
+
             self.upstream.subscribe(Inner(downstream:subscriber))
     }
     
@@ -120,8 +134,10 @@ struct AssertSinglePipeline<Upstream: Publisher>: Publisher {
 }
 
 extension Publisher {
-    func assertSinglePipeline() -> AssertSinglePipeline<Self> {
-        return AssertSinglePipeline(upstream:self)
+    func assertSinglePipeline(_ prefix: String = "",
+                              file: StaticString = #file,
+                              line: UInt = #line) -> AssertSinglePipeline<Self> {
+        return AssertSinglePipeline(upstream:self, prefix: prefix, file: file, line: line)
     }
 }
 
@@ -154,20 +170,46 @@ func authenticate(username: String, password: String) -> Future<Bool, ServerErro
     }
 }
 
-func downloadUserInfo(username: String) -> Future<String, ServerErrors> {
+func downloadUserInfo(username: String) -> AnyPublisher<String, ServerErrors> {
     Future { promise in
         print("Downloading user info")
         DispatchQueue.main.async {
             promise(.success("decoded user data"))
         }
-    }
+    }/*.assertSinglePipeline()*/.eraseToAnyPublisher()
 }
 
-func authenticateAndDownloadUserInfo(username: String, password: String) -> some Publisher {
-    return authenticate(username: username, password: password).flatMap { (isAuthenticated) -> Future<String, ServerErrors> in
-        guard isAuthenticated else {
-            return Future {$0(.failure(.authenticationFailed)) }
+func authenticateAndDownloadUserInfo(username: String, password: String) -> AnyPublisher<String, ServerErrors> {
+    return authenticate(username: username, password: password).flatMap { (isAuthenticated) -> AnyPublisher<String, ServerErrors> in
+        let publisher: AnyPublisher<String, ServerErrors>
+        if isAuthenticated {
+            publisher = downloadUserInfo(username: username)
+        } else {
+            publisher = Fail(error: ServerErrors.authenticationFailed).assertSinglePipeline().eraseToAnyPublisher()
         }
-        return downloadUserInfo(username: username)
-    }
+        return publisher
+    }.eraseToAnyPublisher()
+}
+
+func authenticateAndDownloadUserInfo8080(username: String, password: String) -> AnyPublisher<String, ServerErrors> {
+    return authenticate(username: username, password: password).flatMap { (isAuthenticated) -> AnyPublisher<String, ServerErrors> in
+        let publisher: AnyPublisher<String, ServerErrors>
+        if isAuthenticated {
+            publisher = downloadUserInfo8080(username: username)
+        } else {
+            publisher = Fail(error: ServerErrors.authenticationFailed).assertSinglePipeline().eraseToAnyPublisher()
+        }
+        return publisher
+    }.eraseToAnyPublisher()
+}
+
+
+func downloadUserInfo8080 (username: String) -> AnyPublisher<String, ServerErrors> {
+        return URLSession.shared.dataTaskPublisher(for: URL(string: "http://localhost:8080")!)
+            .mapError { (error) -> ServerErrors in
+                return .noConnection
+        }
+        .map({ (result: URLSession.DataTaskPublisher.Output) -> String in
+            String(decoding: result.data, as: UTF8.self)
+        }).assertSinglePipeline("downloadUserInfo8080").eraseToAnyPublisher()
 }
