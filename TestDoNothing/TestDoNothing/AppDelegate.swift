@@ -16,9 +16,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
-//        let future = authenticateAndDownloadUserInfo(username: "stack", password: "overflow")/*.assertSinglePipeline()*/
+//        let future = authenticateAndDownloadUserInfo(username: "stack", password: "overflow")/*.assertSharedPipeline()*/
 //        let future = downloadUserInfo(username: "Nick")
-        let future = authenticateAndDownloadUserInfo8080(username: "stack", password: "overflow")
+        let future = authenticateAndDownloadUserInfo8080(username: "stack", password: "overflow").share()
 //        let future = downloadUserInfo8080(username: "Nick")
         cancellable2 = future.showActivityIndicatorWhileWaiting(message: "Please wait downloading")
         cancellable = future.sink(receiveCompletion: { (completion) in
@@ -55,7 +55,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
 // based on DoNothing defined: http://www.apeth.com/UnderstandingCombine/operators/operatorscustom.html
-struct AssertSinglePipeline<Upstream: Publisher>: Publisher {
+struct AssertSharedPipeline<Upstream: Publisher>: Publisher {
     typealias Output = Upstream.Output
     typealias Failure = Upstream.Failure
     let upstream: Upstream
@@ -64,7 +64,7 @@ struct AssertSinglePipeline<Upstream: Publisher>: Publisher {
     let line: UInt
     let receivedSubscriptionCount = CountBox()
     init(upstream: Upstream, prefix: String, file: StaticString, line: UInt) {
-        Swift.print("AssertSinglePipeline.init()")
+        Swift.print("AssertSharedPipeline.init()")
         self.upstream = upstream
         self.prefix = prefix
         self.file = file
@@ -74,7 +74,7 @@ struct AssertSinglePipeline<Upstream: Publisher>: Publisher {
     func receive<S>(subscriber: S)
         where S : Subscriber, S.Input == Output, S.Failure == Failure {
             receivedSubscriptionCount.increment()
-            Swift.print("AssertSinglePipeline.receive, \(receivedSubscriptionCount.value)")
+            Swift.print("AssertSharedPipeline.receive, \(receivedSubscriptionCount.value)")
             if receivedSubscriptionCount.value != 1 {
                 let prefix = self.prefix.isEmpty ? "" : self.prefix + ": "
                 fatalError("\(prefix)Only expected one subscriber, but count = \(receivedSubscriptionCount.value). Try adding '.share()' to pipeline", file: file, line: line)
@@ -134,10 +134,10 @@ struct AssertSinglePipeline<Upstream: Publisher>: Publisher {
 }
 
 extension Publisher {
-    func assertSinglePipeline(_ prefix: String = "",
+    func assertSharedPipeline(_ prefix: String = "",
                               file: StaticString = #file,
-                              line: UInt = #line) -> AssertSinglePipeline<Self> {
-        return AssertSinglePipeline(upstream:self, prefix: prefix, file: file, line: line)
+                              line: UInt = #line) -> AssertSharedPipeline<Self> {
+        return AssertSharedPipeline(upstream:self, prefix: prefix, file: file, line: line)
     }
 }
 
@@ -176,7 +176,7 @@ func downloadUserInfo(username: String) -> AnyPublisher<String, ServerErrors> {
         DispatchQueue.main.async {
             promise(.success("decoded user data"))
         }
-    }/*.assertSinglePipeline()*/.eraseToAnyPublisher()
+    }/*.assertSharedPipeline()*/.eraseToAnyPublisher()
 }
 
 func authenticateAndDownloadUserInfo(username: String, password: String) -> AnyPublisher<String, ServerErrors> {
@@ -185,7 +185,7 @@ func authenticateAndDownloadUserInfo(username: String, password: String) -> AnyP
         if isAuthenticated {
             publisher = downloadUserInfo(username: username)
         } else {
-            publisher = Fail(error: ServerErrors.authenticationFailed).assertSinglePipeline().eraseToAnyPublisher()
+            publisher = Fail(error: ServerErrors.authenticationFailed).assertSharedPipeline("authenticateAndDownloadUserInfo").eraseToAnyPublisher()
         }
         return publisher
     }.eraseToAnyPublisher()
@@ -197,7 +197,7 @@ func authenticateAndDownloadUserInfo8080(username: String, password: String) -> 
         if isAuthenticated {
             publisher = downloadUserInfo8080(username: username)
         } else {
-            publisher = Fail(error: ServerErrors.authenticationFailed).assertSinglePipeline().eraseToAnyPublisher()
+            publisher = Fail(error: ServerErrors.authenticationFailed).assertSharedPipeline("authenticate").eraseToAnyPublisher()
         }
         return publisher
     }.eraseToAnyPublisher()
@@ -211,5 +211,5 @@ func downloadUserInfo8080 (username: String) -> AnyPublisher<String, ServerError
         }
         .map({ (result: URLSession.DataTaskPublisher.Output) -> String in
             String(decoding: result.data, as: UTF8.self)
-        }).assertSinglePipeline("downloadUserInfo8080").eraseToAnyPublisher()
+        }).assertSharedPipeline("downloadUserInfo8080").eraseToAnyPublisher()
 }

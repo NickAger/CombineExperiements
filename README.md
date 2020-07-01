@@ -12,13 +12,23 @@ Even if `showActivityIndicatorWhileWaiting` was rewritten using `handleEvent` th
 Subscribing twice (using `sink`) to a `Future` will only result in the `Future` being called **once**.
 
 ### `URLSession.shared.dataTaskPublisher` 
-Subscribing twice (using `sink`) to a `dataTaskPublisher` will result in the `dataTaskPublisher` being called **twice**. BAD!. Established empirically by seeing how many requests are made to a test webserver. Can be detected using `assertSinglePipeline`.
+Subscribing twice (using `sink`) to a `dataTaskPublisher` will result in the `dataTaskPublisher` being called **twice**. BAD!. Established empirically by seeing how many requests are made to a test webserver. Can be detected using `assertSharedPipeline`.
 
 ### `.flatMap`
-Introducing `.flatMap` into a publisher chain that is subscribed to twice (using `sink`) results in the closure being called twice and results in two duplicate chains within the closure. `.assertSinglePipeline` will not recognise multiple subscriptions as the whole pipeline from the closure upwards is duplicated.
+Introducing `.flatMap` into a publisher chain that is subscribed to twice (using `sink`) results in the closure being called twice which causes the creation of a distinct chain for each call within the closure. `.assertSharedPipeline` upstream from the flatmap closure will not recognise multiple subscriptions as the whole upstream pipeline from the closure is duplicated. However adding `.assertSharedPipeline` after flatmap will ensure the flatmap is not called twice.
 
 ### `.share()`
 Calling `share` will solve the multiple subscription issues, but need to ensure that it is called after any flatmaps and before `sink`.
+
+The downstream subscriber receieves elements and completion states unchanged from the upstream publisher. Use this operator when you want to use reference semantics, such as storing a publisher instance in a property.
+
+### `.assertSharedPipeline`
+Use to append to any publisher chain:
+* After `dataTaskPublisher`.
+* After flatMap.
+* At the most downstream.
+
+It's useful to ensure that share() is included before any `flatmap`s or `dataTaskPublisher`
 
 ## See also
 
