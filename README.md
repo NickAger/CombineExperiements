@@ -32,7 +32,8 @@ It's useful to ensure that share() is included before any `flatmap`s or `dataTas
 
 ## See also
 
-* [Opensource independant implementation of Combine](https://github.com/broadwaylamb/OpenCombine)
+* [Opensource independent implementation of Combine](https://github.com/broadwaylamb/OpenCombine)
+* [CombineExt: operators, publishers and utilities that are common in other Reactive Frameworks](https://github.com/CombineCommunity/CombineExt)
 * [Swift Playground explaining the concepts of the new Combine framework](https://github.com/AvdLee/CombineSwiftPlayground)
 * [Combine debugging using operators in Swift](https://www.avanderlee.com/swift/combine-swift/)
 * [Understanding Combine](http://www.apeth.com/UnderstandingCombine/)

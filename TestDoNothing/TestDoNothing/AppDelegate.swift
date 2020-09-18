@@ -18,7 +18,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 //        let future = authenticateAndDownloadUserInfo(username: "stack", password: "overflow")/*.assertSharedPipeline()*/
 //        let future = downloadUserInfo(username: "Nick")
-        let future = authenticateAndDownloadUserInfo8080(username: "stack", password: "overflow").share()
+        let future = authenticateAndDownloadUserInfo8080(username: "stack", password: "overflow").print()
 //        let future = downloadUserInfo8080(username: "Nick")
         cancellable2 = future.showActivityIndicatorWhileWaiting(message: "Please wait downloading")
         cancellable = future.sink(receiveCompletion: { (completion) in
@@ -64,7 +64,7 @@ struct AssertSharedPipeline<Upstream: Publisher>: Publisher {
     let line: UInt
     let receivedSubscriptionCount = CountBox()
     init(upstream: Upstream, prefix: String, file: StaticString, line: UInt) {
-        Swift.print("AssertSharedPipeline.init()")
+//        Swift.print("AssertSharedPipeline.init()")
         self.upstream = upstream
         self.prefix = prefix
         self.file = file
@@ -74,7 +74,7 @@ struct AssertSharedPipeline<Upstream: Publisher>: Publisher {
     func receive<S>(subscriber: S)
         where S : Subscriber, S.Input == Output, S.Failure == Failure {
             receivedSubscriptionCount.increment()
-            Swift.print("AssertSharedPipeline.receive, \(receivedSubscriptionCount.value)")
+ //           Swift.print("AssertSharedPipeline.receive, \(receivedSubscriptionCount.value)")
             if receivedSubscriptionCount.value != 1 {
                 let prefix = self.prefix.isEmpty ? "" : self.prefix + ": "
                 fatalError("\(prefix)Only expected one subscriber, but count = \(receivedSubscriptionCount.value). Try adding '.share()' to pipeline", file: file, line: line)
@@ -141,6 +141,15 @@ extension Publisher {
     }
 }
 
+
+//extension Publisher {
+//    func assertSharedPipeline(_ prefix: String = "",
+//                              file: StaticString = #file,
+//                              line: UInt = #line) -> AssertSharedPipeline<Self> {
+//        return AssertSharedPipeline(upstream:self, prefix: prefix, file: file, line: line)
+//    }
+//}
+
 // ---
 
 //extension Publisher {
@@ -163,7 +172,7 @@ enum ServerErrors: Error {
 
 func authenticate(username: String, password: String) -> Future<Bool, ServerErrors> {
     Future { promise in
-        print("Calling server to authenticate")
+//        print("Calling server to authenticate")
         DispatchQueue.main.async {
             promise(.success(true))
         }
@@ -172,7 +181,7 @@ func authenticate(username: String, password: String) -> Future<Bool, ServerErro
 
 func downloadUserInfo(username: String) -> AnyPublisher<String, ServerErrors> {
     Future { promise in
-        print("Downloading user info")
+//        print("Downloading user info")
         DispatchQueue.main.async {
             promise(.success("decoded user data"))
         }
